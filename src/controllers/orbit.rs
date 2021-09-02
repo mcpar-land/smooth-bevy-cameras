@@ -54,13 +54,14 @@ impl OrbitCameraBundle {
 }
 
 /// A 3rd person camera that orbits around the target.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug)]
 pub struct OrbitCameraController {
     pub enabled: bool,
     pub mouse_rotate_sensitivity: Vec2,
     pub mouse_translate_sensitivity: Vec2,
     pub mouse_wheel_zoom_sensitivity: f32,
     pub smoothing_weight: f32,
+    pub key: KeyCode,
 }
 
 impl Default for OrbitCameraController {
@@ -71,6 +72,7 @@ impl Default for OrbitCameraController {
             mouse_wheel_zoom_sensitivity: 0.15,
             smoothing_weight: 0.8,
             enabled: true,
+            key: KeyCode::LAlt,
         }
     }
 }
@@ -100,6 +102,7 @@ pub fn default_input_map(
         mouse_rotate_sensitivity,
         mouse_translate_sensitivity,
         mouse_wheel_zoom_sensitivity,
+        key,
         ..
     } = *controller;
 
@@ -112,21 +115,20 @@ pub fn default_input_map(
         cursor_delta += event.delta;
     }
 
-    if keyboard.pressed(KeyCode::LControl) {
-        events.send(ControlEvent::Orbit(mouse_rotate_sensitivity * cursor_delta));
+    if keyboard.pressed(key) {
+        if mouse_buttons.pressed(MouseButton::Right) {
+            events.send(ControlEvent::TranslateTarget(
+                mouse_translate_sensitivity * cursor_delta,
+            ));
+        } else {
+            events.send(ControlEvent::Orbit(mouse_rotate_sensitivity * cursor_delta));
+        }
+        let mut scalar = 1.0;
+        for event in mouse_wheel_reader.iter() {
+            scalar *= 1.0 + -event.y * mouse_wheel_zoom_sensitivity;
+        }
+        events.send(ControlEvent::Zoom(scalar));
     }
-
-    if mouse_buttons.pressed(MouseButton::Right) {
-        events.send(ControlEvent::TranslateTarget(
-            mouse_translate_sensitivity * cursor_delta,
-        ));
-    }
-
-    let mut scalar = 1.0;
-    for event in mouse_wheel_reader.iter() {
-        scalar *= 1.0 + -event.y * mouse_wheel_zoom_sensitivity;
-    }
-    events.send(ControlEvent::Zoom(scalar));
 }
 
 pub fn control_system(
